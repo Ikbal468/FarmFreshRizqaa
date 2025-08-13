@@ -92,9 +92,70 @@ document.getElementById('saveInvoiceBtn').addEventListener('click', async () => 
   const subtotal = items.reduce((s,it)=> s + Number(it.total_price), 0);
   const grand_total = +(subtotal + cod_fees).toFixed(2);
 
-  statusEl.style.color = 'black';
-  statusEl.textContent = 'Saving invoice...';
   try {
+    // ✅ 1. Check if buyer already has an invoice today
+    const { data: existingInvoice, error: checkErr } = await supabaseClient
+      .from('invoices')
+      .select('*')
+      .eq('buyer_name', buyer_name)
+      .eq('invoice_date', invoice_date)
+      .maybeSingle();
+
+    if (checkErr) throw checkErr;
+
+    if (existingInvoice) {
+  alert(`⚠️ ${buyer_name} already has an invoice saved for ${invoice_date}. Fetching details...`);
+
+  // Populate form fields
+  document.getElementById('buyer_name').value = existingInvoice.buyer_name || '';
+  document.getElementById('address').value = existingInvoice.address || '';
+  document.getElementById('phone').value = existingInvoice.phone || '';
+  document.getElementById('invoice_no').value = existingInvoice.invoice_no || '';
+  document.getElementById('invoice_date').value = existingInvoice.invoice_date || '';
+  codInput.value = existingInvoice.cod_fees?.toFixed(2) || '0.00';
+
+  // Load items
+  const { data: existingItems, error: itemsErr } = await supabaseClient
+    .from('invoice_items')
+    .select('*')
+    .eq('invoice_id', existingInvoice.id);
+
+  if (!itemsErr && existingItems.length) {
+  items = existingItems.map(it => ({
+    invoice_no: existingInvoice.invoice_no,    // from parent invoice
+    invoice_date: existingInvoice.invoice_date, // from parent invoice
+    product_name: it.product_name,
+    quantity: it.quantity,
+    price_unit: it.price_unit,
+    total_price: it.total_price,
+    cod_fee: existingInvoice.cod_fees          // from parent invoice
+  }));
+  renderItems();
+}
+
+  // ✅ Ensure lastSavedInvoice has all fields for PDF
+  lastSavedInvoice = {
+    invoice_id: existingInvoice.id,
+    invoice_no: existingInvoice.invoice_no,
+    buyer_name: existingInvoice.buyer_name,
+    address: existingInvoice.address,
+    phone: existingInvoice.phone,
+    invoice_date: existingInvoice.invoice_date,
+    cod_fees: existingInvoice.cod_fees,
+    subtotal: existingInvoice.subtotal,
+    grand_total: existingInvoice.grand_total,
+    items: items
+  };
+
+  // Show download button
+  downloadPDFBtn.classList.remove('hidden');
+  return;
+}
+
+    statusEl.style.color = 'black';
+    statusEl.textContent = 'Saving invoice...';
+
+    // ✅ 2. Proceed with original save logic
     const { data:invoiceData, error:invErr } = await supabaseClient
       .from('invoices')
       .insert([{
@@ -121,14 +182,28 @@ document.getElementById('saveInvoiceBtn').addEventListener('click', async () => 
     if (itemsErr) throw itemsErr;
 
     lastSavedInvoice = {
-      invoice_id, invoice_no, buyer_name, address, phone, invoice_date, cod_fees, subtotal, grand_total, items: [...items]
-    };
+  invoice_id,
+  invoice_no,
+  buyer_name,
+  address,
+  phone,
+  invoice_date,
+  cod_fees,
+  subtotal,
+  grand_total,
+  items: items.map(it => ({
+    invoice_no,
+    invoice_date,
+    ...it,
+    cod_fee: cod_fees
+  }))
+};
 
     statusEl.style.color='green';
     statusEl.textContent = 'Invoice saved';
     downloadPDFBtn.classList.remove('hidden');
 
-    alert("✅ Invoice saved successfully!"); // <-- popup
+    alert("✅ Invoice saved successfully!");
 
     items = [];
     renderItems();
@@ -170,31 +245,31 @@ document.getElementById('searchBuyerBtn').addEventListener('click', async () => 
     if (itemsErr) throw itemsErr;
 
     const mergedItems = itemsData.map(it => {
-    const inv = invoices.find(i => i.id === it.invoice_id);
-    return {
-        ...it,
-        invoice_date: inv?.invoice_date || '',
-        buyer_name: inv?.buyer_name || '',
-        address: inv?.address || '',
-        phone: inv?.phone || '',
-        cod_fee: inv?.cod_fees || 0 // ✅ attach COD fee from invoices table
-    };
-    });
+  const inv = invoices.find(i => i.id === it.invoice_id);
+  return {
+    ...it,
+    invoice_no: inv?.invoice_no || '',
+    invoice_date: inv?.invoice_date || '',
+    buyer_name: inv?.buyer_name || '',
+    address: inv?.address || '',
+    phone: inv?.phone || '',
+    cod_fee: inv?.cod_fees || 0
+  };
+});
 
+// Total COD for the day
+const totalCOD = invoices.reduce((sum, inv) => sum + Number(inv.cod_fees || 0), 0);
 
-    lastSavedInvoice = {
-      buyer_name: buyerName,
-      items: mergedItems
-    };
-
-    // After you fetch invoices and items
-    const totalCOD = invoices.reduce((sum, inv) => sum + Number(inv.cod_fees || 0), 0);
-
-    // Store it in lastSavedInvoice so PDF can access it
-    lastSavedInvoice = {
-    items: mergedItems,
-    totalCOD: totalCOD
-    };
+// Store ALL info in lastSavedInvoice
+lastSavedInvoice = {
+  buyer_name: invoices[0]?.buyer_name || '',
+  address: invoices[0]?.address || '',
+  phone: invoices[0]?.phone || '',
+  invoice_no: invoices[0]?.invoice_no || '',
+  invoice_date: invoices[0]?.invoice_date || '',
+  items: mergedItems,
+  totalCOD: totalCOD
+};
 
     downloadPDFBtn.classList.remove('hidden');
 
@@ -222,7 +297,7 @@ downloadPDFBtn.addEventListener('click', () => {
   doc.rect(0, 0, 210, 20, 'F');
   doc.setFontSize(18);
   doc.setTextColor(0, 0, 0);
-  doc.text("INVOICE REPORT", 105, 13, { align: "center" });
+  doc.text("INVOICE", 105, 13, { align: "center" });
 
   // ===== STORE INFO =====
   doc.setFontSize(12);
@@ -243,9 +318,9 @@ downloadPDFBtn.addEventListener('click', () => {
   doc.text("Buyer Information:", 14, 54);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
-  doc.text(`Name: ${buyer.buyer_name || '-'}`, 14, 60);
-  doc.text(`Address: ${buyer.address || '-'}`, 14, 66);
-  doc.text(`Phone: ${buyer.phone || '-'}`, 14, 72);
+  doc.text(`Name: ${lastSavedInvoice.buyer_name || '-'}`, 14, 60);
+doc.text(`Address: ${lastSavedInvoice.address || '-'}`, 14, 66);
+doc.text(`Phone: ${lastSavedInvoice.phone || '-'}`, 14, 72);
 
   // Separator line
   doc.setDrawColor(0);
@@ -253,12 +328,12 @@ downloadPDFBtn.addEventListener('click', () => {
 
   // ===== TABLE =====
 const tableRows = lastSavedInvoice.items.map(it => [
-  it.invoice_id || "",
+  it.invoice_no || "",
   it.product_name || "",
   it.quantity?.toString() || "0",
   Number(it.price_unit || 0).toFixed(2),
   Number(it.total_price || 0).toFixed(2),
-  it.cod_fee ? Number(it.cod_fee).toFixed(2) : "", // COD fee from database if available
+  it.cod_fee ? Number(it.cod_fee).toFixed(2) : "",
   it.invoice_date || ""
 ]);
 
@@ -317,5 +392,3 @@ async function saveInvoice(invoiceData) {
         alert("✅ Invoice saved successfully!");
     }
 }
-
-

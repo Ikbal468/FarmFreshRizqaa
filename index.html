@@ -4,65 +4,65 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>Login - Farm Fresh Purchase Recorder</title>
-  <link rel="stylesheet" href="style.css">
+
+  <!-- Tab icon (favicon) -->
+  <link rel="icon" type="image/jpeg"
+        href="https://static.vecteezy.com/system/resources/thumbnails/004/572/128/small/invoice-line-icon-logo-illustration-free-vector.jpg">
+
   <style>
-    /* Simple login page styling */
     body {
       font-family: Arial, sans-serif;
-      background: #f2f2f2;
+      margin: 0;
+      height: 100vh;
       display: flex;
       justify-content: center;
       align-items: center;
-      height: 100vh;
-      margin: 0;
+      background: url('https://images.unsplash.com/photo-1592833159111-a9c9f1fa48eb') no-repeat center center/cover;
+    }
+    .overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.4);
     }
     .login-card {
-      background: white;
-      padding: 20px 25px;
-      border-radius: 8px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1);
-      max-width: 320px;
-      width: 100%;
+      position: relative; z-index: 1;
+      background: rgba(255,255,255,0.85);
+      backdrop-filter: blur(5px);
+      padding: 25px 30px;
+      border-radius: 10px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+      max-width: 350px; width: 100%;
     }
     .login-card h2 {
       text-align: center;
       margin-bottom: 20px;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      font-size: 1.4em;
     }
-    .login-card label {
-      display: block;
-      margin-top: 10px;
-    }
+    .login-card h2 img { height: 30px; }
+    .login-card label { display: block; margin-top: 10px; font-weight: bold; }
     .login-card input {
-      width: 100%;
-      padding: 8px;
-      margin-top: 5px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
+      width: 100%; padding: 10px; margin-top: 5px;
+      border: 1px solid #ccc; border-radius: 5px;
     }
     .login-card button {
-      margin-top: 15px;
-      width: 100%;
-      padding: 10px;
-      background: #4CAF50;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
+      margin-top: 15px; width: 100%; padding: 10px;
+      background: #4CAF50; color: #fff; border: none; border-radius: 5px; cursor: pointer;
+      font-size: 1em;
     }
-    .login-card button:hover {
-      background: #45a049;
-    }
-    .error {
-      color: red;
-      margin-top: 10px;
-      text-align: center;
-    }
+    .login-card button:hover { background: #45a049; }
+    .error { color: red; margin-top: 10px; text-align: center; font-size: 0.9em; }
   </style>
 </head>
 <body>
 
+<div class="overlay"></div>
+
 <div class="login-card">
-  <h2>Login</h2>
+  <h2>
+    <img src="https://static.vecteezy.com/system/resources/thumbnails/004/572/128/small/invoice-line-icon-logo-illustration-free-vector.jpg" alt="Invoice Icon">
+    Login
+  </h2>
+
   <label>Username</label>
   <input type="text" id="username" placeholder="Enter username">
   
@@ -70,7 +70,6 @@
   <input type="password" id="password" placeholder="Enter password">
 
   <button onclick="login()">Login</button>
-
   <div class="error" id="errorMsg"></div>
 </div>
 
@@ -81,7 +80,6 @@ function login() {
   const errorMsg = document.getElementById("errorMsg");
 
   if (user === "farmfreshrizqaa" && pass === "password12345") {
-    // Redirect to invoice page
     window.location.href = "invoice.html";
   } else {
     errorMsg.textContent = "Invalid username or password!";
