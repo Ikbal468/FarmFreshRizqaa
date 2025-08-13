@@ -26,7 +26,7 @@ document.getElementById('addProductBtn').addEventListener('click', () => {
   const qty = parseInt(qtyInput.value || 0);
   const price = parseFloat(priceUnitInput.value || 0);
   if (!name || qty <= 0 || isNaN(price)) {
-    alert('Please provide valid product name, quantity, and price.');
+    alert('Please provide valid product name, qty, and price.');
     return;
   }
   const total = +(qty * price).toFixed(2);
@@ -317,4 +317,5 @@ async function saveInvoice(invoiceData) {
         alert("✅ Invoice saved successfully!");
     }
 }
+
 
