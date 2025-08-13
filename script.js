@@ -95,59 +95,99 @@ document.getElementById('saveInvoiceBtn').addEventListener('click', async () => 
   try {
     // ✅ 1. Check if buyer already has an invoice today
     const { data: existingInvoice, error: checkErr } = await supabaseClient
-      .from('invoices')
-      .select('*')
-      .eq('buyer_name', buyer_name)
-      .eq('invoice_date', invoice_date)
-      .maybeSingle();
+  .from('invoices')
+  .select('*')
+  .eq('buyer_name', buyer_name)
+  .eq('invoice_date', invoice_date);
 
-    if (checkErr) throw checkErr;
+if (checkErr) throw checkErr;
 
     if (existingInvoice) {
-  alert(`⚠️ ${buyer_name} already has an invoice saved for ${invoice_date}. Fetching details...`);
+  alert(`ℹ️ Creating a new invoice...`);
 
-  // Populate form fields
-  document.getElementById('buyer_name').value = existingInvoice.buyer_name || '';
-  document.getElementById('address').value = existingInvoice.address || '';
-  document.getElementById('phone').value = existingInvoice.phone || '';
-  document.getElementById('invoice_no').value = existingInvoice.invoice_no || '';
-  document.getElementById('invoice_date').value = existingInvoice.invoice_date || '';
-  codInput.value = existingInvoice.cod_fees?.toFixed(2) || '0.00';
+  // Generate new invoice number and date
+  const newInvoiceNo = new Date().getTime().toString();
+  const codFee = parseFloat(codInput.value || 0);
+  const subtotalValue = items.reduce((s, it) => s + Number(it.total_price), 0);
+  const grandTotalValue = +(subtotalValue + codFee).toFixed(2);
 
-  // Load items
-  const { data: existingItems, error: itemsErr } = await supabaseClient
-    .from('invoice_items')
-    .select('*')
-    .eq('invoice_id', existingInvoice.id);
+  // Insert new invoice
+  const { data: invoiceDataArray, error: invErr } = await supabaseClient
+    .from('invoices')
+    .insert([{
+      invoice_no: newInvoiceNo,
+      buyer_name,
+      address,
+      phone,
+      invoice_date,
+      cod_fees: codFee,
+      subtotal: subtotalValue,
+      grand_total: grandTotalValue
+    }])
+    .select('id, invoice_no, invoice_date, cod_fees');
 
-  if (!itemsErr && existingItems.length) {
-  items = existingItems.map(it => ({
-    invoice_no: existingInvoice.invoice_no,    // from parent invoice
-    invoice_date: existingInvoice.invoice_date, // from parent invoice
+  if (invErr) throw invErr;
+
+  const invoiceData = invoiceDataArray[0];
+  const invoice_id = invoiceData.id;
+
+  // Insert items for this new invoice
+  const itemsToInsert = items.map(it => ({
+    invoice_id,
     product_name: it.product_name,
     quantity: it.quantity,
     price_unit: it.price_unit,
-    total_price: it.total_price,
-    cod_fee: existingInvoice.cod_fees          // from parent invoice
+    total_price: it.total_price
   }));
-  renderItems();
-}
 
-  // ✅ Ensure lastSavedInvoice has all fields for PDF
+  const { error: itemsErr } = await supabaseClient
+    .from('invoice_items')
+    .insert(itemsToInsert);
+
+  if (itemsErr) throw itemsErr;
+
+  alert("✅ New invoice created!");
+
+  // Clear table after save
+  items = [];
+  renderItems();
+
+  // === Fetch ALL invoices for this buyer for this date ===
+  const { data: allInvoices, error: allInvErr } = await supabaseClient
+    .from('invoices')
+    .select('*')
+    .eq('buyer_name', buyer_name)
+    .eq('invoice_date', invoice_date);
+
+  if (allInvErr) throw allInvErr;
+
+  const invoiceIds = allInvoices.map(inv => inv.id);
+
+  const { data: allItems, error: allItemsErr } = await supabaseClient
+    .from('invoice_items')
+    .select('*')
+    .in('invoice_id', invoiceIds);
+
+  if (allItemsErr) throw allItemsErr;
+
+  // Merge items with their invoice info
   lastSavedInvoice = {
-    invoice_id: existingInvoice.id,
-    invoice_no: existingInvoice.invoice_no,
-    buyer_name: existingInvoice.buyer_name,
-    address: existingInvoice.address,
-    phone: existingInvoice.phone,
-    invoice_date: existingInvoice.invoice_date,
-    cod_fees: existingInvoice.cod_fees,
-    subtotal: existingInvoice.subtotal,
-    grand_total: existingInvoice.grand_total,
-    items: items
+    buyer_name,
+    address,
+    phone,
+    invoice_date,
+    items: allItems.map(it => {
+      const inv = allInvoices.find(i => i.id === it.invoice_id);
+      return {
+        ...it,
+        invoice_no: inv.invoice_no,
+        invoice_date: inv.invoice_date,
+        cod_fee: inv.cod_fees
+      };
+    }),
+    totalCOD: allInvoices.reduce((sum, inv) => sum + Number(inv.cod_fees || 0), 0)
   };
 
-  // Show download button
   downloadPDFBtn.classList.remove('hidden');
   return;
 }
@@ -156,16 +196,17 @@ document.getElementById('saveInvoiceBtn').addEventListener('click', async () => 
     statusEl.textContent = 'Saving invoice...';
 
     // ✅ 2. Proceed with original save logic
-    const { data:invoiceData, error:invErr } = await supabaseClient
-      .from('invoices')
-      .insert([{
-        invoice_no, buyer_name, address, phone, invoice_date, cod_fees, subtotal, grand_total
-      }])
-      .select('id')
-      .single();
+    const { data: invoiceDataArray, error: invErr } = await supabaseClient
+  .from('invoices')
+  .insert([{
+    invoice_no, buyer_name, address, phone, invoice_date, cod_fees, subtotal, grand_total
+  }])
+  .select('*'); // select * to get invoice_no, invoice_date, cod_fees etc.
 
-    if (invErr) throw invErr;
-    const invoice_id = invoiceData.id;
+if (invErr) throw invErr;
+
+const invoiceData = invoiceDataArray[0]; // first inserted invoice
+const invoice_id = invoiceData.id;
 
     const itemsToInsert = items.map(it => ({
       invoice_id,
@@ -347,7 +388,9 @@ doc.autoTable({
 
   // ===== TOTALS =====
   const subtotal = lastSavedInvoice.items.reduce((sum, it) => sum + Number(it.total_price || 0), 0);
-  const cod = Number(lastSavedInvoice.totalCOD || 0);
+  const cod = Number(
+    lastSavedInvoice.totalCOD ?? lastSavedInvoice.cod_fees ?? 0
+);
   const grandTotal = subtotal + cod;
 
   let finalY = doc.lastAutoTable.finalY + 10;
