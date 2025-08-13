@@ -1,0 +1,93 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Login - Farm Fresh Purchase Recorder</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    /* Simple login page styling */
+    body {
+      font-family: Arial, sans-serif;
+      background: #f2f2f2;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+    .login-card {
+      background: white;
+      padding: 20px 25px;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      max-width: 320px;
+      width: 100%;
+    }
+    .login-card h2 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .login-card label {
+      display: block;
+      margin-top: 10px;
+    }
+    .login-card input {
+      width: 100%;
+      padding: 8px;
+      margin-top: 5px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    .login-card button {
+      margin-top: 15px;
+      width: 100%;
+      padding: 10px;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .login-card button:hover {
+      background: #45a049;
+    }
+    .error {
+      color: red;
+      margin-top: 10px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+<div class="login-card">
+  <h2>Login</h2>
+  <label>Username</label>
+  <input type="text" id="username" placeholder="Enter username">
+  
+  <label>Password</label>
+  <input type="password" id="password" placeholder="Enter password">
+
+  <button onclick="login()">Login</button>
+
+  <div class="error" id="errorMsg"></div>
+</div>
+
+<script>
+function login() {
+  const user = document.getElementById("username").value.trim();
+  const pass = document.getElementById("password").value.trim();
+  const errorMsg = document.getElementById("errorMsg");
+
+  if (user === "farmfreshrizqaa" && pass === "password12345") {
+    // Redirect to invoice page
+    window.location.href = "invoice.html";
+  } else {
+    errorMsg.textContent = "Invalid username or password!";
+  }
+}
+</script>
+
+</body>
+</html>
